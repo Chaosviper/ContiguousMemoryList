@@ -25,10 +25,13 @@ template<typename T> class ListMod{
 
 	class iterator{
 
+		T** pointerToPreviousElemNextPointer;
 		T** pointerToNextPointer;
 		T* pointerActualT;
 
 		T* lastTPointer;
+
+		friend void ListMod::insert(iterator position, const T& value); // rendo friend il metodo Insert della classe ListMod in modo da permettergli di accedere alle variabili private.
 
 		public:
 			iterator(void* startingPoint, const ListMod<T>& source): lastTPointer(static_cast<T*>(source.end)) { // qui, non effettui l'accesso a nessuno dei puntatori calcolati
@@ -36,11 +39,13 @@ template<typename T> class ListMod{
 
 				pointerActualT = headCasted;
 				pointerToNextPointer = reinterpret_cast<T**>(headCasted +1);
+				pointerToPreviousElemNextPointer = nullptr;
 
 				if(IS_DEBUG_MODE)
 					cout << "Pointers constructor: " << pointerActualT << "     " << pointerToNextPointer << endl;
 			}; 
 
+			// Due iterator sono uguali se il puntatore all'elemento T attuale e' uguale
 			bool operator==(iterator& toCheck){
 				return pointerActualT == toCheck.pointerActualT;
 			}
@@ -56,6 +61,7 @@ template<typename T> class ListMod{
 					return *(this);
 				}
 
+				pointerToPreviousElemNextPointer = pointerToNextPointer;
 				pointerActualT = *(pointerToNextPointer);
 				pointerToNextPointer = reinterpret_cast<T**>(pointerActualT + 1);
 
@@ -63,6 +69,12 @@ template<typename T> class ListMod{
 					cout  << "Pointers after ++: " << pointerActualT << "     " << pointerToNextPointer << endl;
 
 				return *(this);
+			}
+
+			iterator& operator++(int dummy){
+
+				return ++(*(this));
+			
 			}
 
 			// ritorna l'oggetto attuale dell'iterazione
@@ -155,6 +167,45 @@ template<typename T> class ListMod{
 		size++;
 	}
 
+	void insert(iterator position, const T& value){
+		T* elemToInsertNextValue = position.pointerActualT; // ricavabile anche da: &(*(position))
+		T** previusElemNextValue = position.pointerToPreviousElemNextPointer;
+
+		// 1) ** inserisco T nella posizione attuale di end
+		T* actualPointerT = static_cast<T*>(end);
+
+		// 1.1) *** se non e' il primo inserimento, inserisco il puntatore a questo elemento nello spazio riservato al next del T precedente
+		if(previusElemNextValue != nullptr)
+			*(previusElemNextValue) = actualPointerT;
+
+		// 1.2) *** assegno il valore passato allo spazio allocato
+		*(actualPointerT) = value;
+/*
+		// aggiorno l'iteratore (1/3)
+		position.pointerActualT = actualPointerT;
+*/
+		actualPointerT++;
+
+		// 2) ** inizializzo la memoria per il puntatore al next dell'elemento appena inserito (nullptr essendo un push_back)
+		T** actualPointerPointerT = reinterpret_cast<T**>(actualPointerT);
+		if(elemToInsertNextValue != nullptr)
+			*(actualPointerPointerT) = elemToInsertNextValue;
+
+/*
+		// aggiorno l'iteratore (2/3)
+		position.pointerToNextPointer = actualPointerPointerT;
+*/
+		actualPointerPointerT++;
+
+		position.lastTPointer = reinterpret_cast<T*>(actualPointerPointerT);
+
+		// 3) ** Aggiorno l'ultimo elelmento e il puntatore alla fine della lista
+		end = static_cast<void*>(actualPointerPointerT);
+
+
+		size++;		
+	}
+
 	// Sfrutto il mio iterator!!
 	T& operator[](int pos){
 		if(pos<size){
@@ -182,9 +233,16 @@ template<typename T> class ListMod{
 		return iterator(end, *(this));
 	}
 
-	// ******* DA RIFAREE!!! ********
+	~ListMod(){
+		free(memoryHead);
+	}
+
+	// ******* DEBUG METHODS ********
 
 	void printMemory(){
+		cout << "**********************************************" << endl;
+		cout << "*************** MEMORY STATUS ****************" << endl;
+		cout << "**********************************************" << endl;
 
 		cout << "size of T*: " << sizeof(T*) << endl;
 		cout << "size of T: " << sizeof(T) << endl << endl;
@@ -207,6 +265,10 @@ template<typename T> class ListMod{
 
 			actual = static_cast<void*>(x2);
 		}
+
+		cout << "**********************************************" << endl;
+		cout << "******************** END *********************" << endl;
+		cout << "**********************************************" << endl;
 	}
 };
 
@@ -225,10 +287,39 @@ int main(){
 		ciao.printMemory();
 
 	ListMod<A>::iterator end = ciao.End();
-	for(ListMod<A>::iterator i = ciao.Begin(); i != end; ++i){
+	for(ListMod<A>::iterator i = ciao.Begin(); i != end; i++){
 		i->print();
 	}
 
+	int k=0;
+
+	end = ciao.End();
+	for(ListMod<A>::iterator i = ciao.Begin(); i != end; i++, k++){
+		if(k==2){
+			if(IS_DEBUG_MODE) 
+				cout << "Inserted new Value A(100,100) in pos 2" << endl;
+			ciao.insert(i, A(100,100));
+		}
+		i->print();
+	}
+
+	k=0;
+
+	end = ciao.End();
+	for(ListMod<A>::iterator i = ciao.Begin(); i != end; i++, k++){
+		if(k==4){
+			if(IS_DEBUG_MODE) 
+				cout << "Inserted new Value A(200,200) in pos 4" << endl;
+			ciao.insert(i, A(200,200));
+		}
+		i->print();
+	}
+
+	/*ListMod<A>::iterator x = ciao.Begin();
+	x++;
+	x++;
+	x++;
+	ciao.insert(x, A(100,100));*/
 	ciao[4].print();
 	ciao[3].print();
 	ciao[2].print();
