@@ -1,4 +1,4 @@
-#import <iostream>
+#include <iostream>
 
 using namespace std;
 
@@ -25,32 +25,53 @@ template<typename T> class ListMod{
 
 	class iterator{
 
-		T** pointerToPreviousElemNextPointer;
+		T** pointerToPreviousElemNextPointer; // <-- Utile alla insert della classe ListMod
 		T** pointerToNextPointer;
 		T* pointerActualT;
 
 		T* lastTPointer;
 
 		friend void ListMod::insert(iterator position, const T& value); // rendo friend il metodo Insert della classe ListMod in modo da permettergli di accedere alle variabili private.
+		friend iterator ListMod::Begin() const; // rendo friend il metodo Begin della classe ListMod per poter chiamare il costruttore di Iterator.
+		friend iterator ListMod::End() const; // endo friend il metodo End della classe ListMod per poter chiamare il costruttore di Iterator.
+
+		iterator(void* startingPoint, const ListMod<T>& source): lastTPointer(static_cast<T*>(source.end)) { // qui, non effettui l'accesso a nessuno dei puntatori calcolati
+			T* headCasted = static_cast<T*>(startingPoint);
+
+			pointerActualT = headCasted;
+			pointerToNextPointer = reinterpret_cast<T**>(headCasted +1);
+			pointerToPreviousElemNextPointer = nullptr;
+
+			if(IS_DEBUG_MODE)
+				cout << "Pointers constructor: " << pointerActualT << "     " << pointerToNextPointer << endl;
+		}; 
 
 		public:
-			iterator(void* startingPoint, const ListMod<T>& source): lastTPointer(static_cast<T*>(source.end)) { // qui, non effettui l'accesso a nessuno dei puntatori calcolati
-				T* headCasted = static_cast<T*>(startingPoint);
+			
+			// Nel costruttore di copia mi basta copiare tutti gli indirizzi
+			iterator(const iterator& toCopy){
+				pointerToPreviousElemNextPointer = toCopy.pointerToPreviousElemNextPointer;
+				pointerToNextPointer = toCopy.pointerToNextPointer;
+				pointerActualT = toCopy.pointerActualT;
+				lastTPointer = toCopy.lastTPointer;
+			}
 
-				pointerActualT = headCasted;
-				pointerToNextPointer = reinterpret_cast<T**>(headCasted +1);
-				pointerToPreviousElemNextPointer = nullptr;
+			// Anche nel caso dell'operatore di assegnamento mi basta copiare tutti gli indirizzi
+			iterator& operator=(const iterator& toCopy){
+				pointerToPreviousElemNextPointer = toCopy.pointerToPreviousElemNextPointer;
+				pointerToNextPointer = toCopy.pointerToNextPointer;
+				pointerActualT = toCopy.pointerActualT;
+				lastTPointer = toCopy.lastTPointer;
 
-				if(IS_DEBUG_MODE)
-					cout << "Pointers constructor: " << pointerActualT << "     " << pointerToNextPointer << endl;
-			}; 
+				return *(this);
+			}
 
 			// Due iterator sono uguali se il puntatore all'elemento T attuale e' uguale
-			bool operator==(iterator& toCheck){
+			bool operator==(iterator& toCheck) const{
 				return pointerActualT == toCheck.pointerActualT;
 			}
 
-			bool operator!=(iterator& toCheck){
+			bool operator!=(iterator& toCheck) const{
 				return pointerActualT != toCheck.pointerActualT;
 			}
 
@@ -71,19 +92,20 @@ template<typename T> class ListMod{
 				return *(this);
 			}
 
-			iterator& operator++(int dummy){
-
-				return ++(*(this));
+			iterator operator++(int dummy){
+				iterator toReturn(*(this));
+				++(*(this)); // Se facessi (*this)++ entrerei di nuovo in questa funzione => loop infinito
+				return toReturn;
 			
 			}
 
-			// ritorna l'oggetto attuale dell'iterazione
-			T& operator*(){
+			// ritorna l'oggetto attuale dell'iterazione (RIFERITO ALL'ITERATOR, NON AL THIS (che e' il suo puntato))
+			T& operator*() const{
 				return *(pointerActualT);
 			}
 
-			// ritorna il puntatore all'oggetto attuale
-			T* operator->(){
+			// ritorna il puntatore all'oggetto attuale (RIFERITO ALL'ITERATOR, NON AL THIS (che e' il suo puntato))
+			T* operator->() const{
 				return pointerActualT;
 			}
 
@@ -207,7 +229,7 @@ template<typename T> class ListMod{
 	}
 
 	// Sfrutto il mio iterator!!
-	T& operator[](int pos){
+	T& operator[](int pos) const{
 		if(pos<size){
 			ListMod<A>::iterator iter = Begin();
 			
@@ -224,12 +246,12 @@ template<typename T> class ListMod{
 	}
 
 	// NOTA: se mettessi una ref come ritorno di questa funzione avrei un accesso a memoria eliminata!!!!!
-	iterator Begin(){
+	iterator Begin() const{
 		return iterator(head, *(this));
 	}
 
 	// NOTA: anche qui, se mettessi una ref come ritorno di questa funzione avrei un accesso a memoria eliminata!!!!!
-	iterator End(){
+	iterator End() const{
 		return iterator(end, *(this));
 	}
 
@@ -239,7 +261,7 @@ template<typename T> class ListMod{
 
 	// ******* DEBUG METHODS ********
 
-	void printMemory(){
+	void printMemory() const{
 		cout << "**********************************************" << endl;
 		cout << "*************** MEMORY STATUS ****************" << endl;
 		cout << "**********************************************" << endl;
@@ -287,9 +309,12 @@ int main(){
 		ciao.printMemory();
 
 	ListMod<A>::iterator end = ciao.End();
-	for(ListMod<A>::iterator i = ciao.Begin(); i != end; i++){
-		i->print();
+	for(ListMod<A>::iterator i = ciao.Begin(); i != end; ){
+		(*i++).print();  // TEST ITERATOR 1: *i++
+		//i->print();
 	}
+
+	*(ciao.Begin()) = A(0.1111, 1); // TEST ITERATOR 2: *i = x
 
 	int k=0;
 
@@ -331,4 +356,6 @@ int main(){
 
 	if(IS_DEBUG_MODE)
 		ciao.printMemory();
+
+	return 0;
 }
